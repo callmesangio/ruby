@@ -1558,6 +1558,62 @@ rb_mod_include_p(VALUE mod, VALUE mod2)
     return Qfalse;
 }
 
+char *
+objstr(VALUE obj)
+{
+    if (obj == 0) return "NULL";
+    if (obj == Qundef) return "Qundef";
+
+    VALUE str;
+
+    if (BUILTIN_TYPE(obj) == T_ICLASS) {
+        str = rb_str_concat(
+            rb_str_new_cstr("iclass of "),
+            rb_obj_as_string(rb_class_of(obj))
+        );
+    } else {
+        str = rb_obj_as_string(obj);
+    }
+    return rb_string_value_cstr(&str);
+}
+
+void
+objdebug(VALUE p)
+{
+    VALUE super = RCLASS_SUPER(p);
+    VALUE origin = RCLASS_ORIGIN(p);
+    struct rb_id_table *m_tbl = RCLASS_M_TBL(p);
+    struct rb_id_table *const_tbl = RCLASS_CONST_TBL(p);
+
+    printf("p: %lu (%s)\n", p, objstr(p));
+    printf("typeof p: %x\n", rb_type(p));
+    printf("classof p: %s\n", objstr(rb_class_of(p)));
+    printf("superof p: %lu (%s)\n", super, objstr(super));
+    printf("origin_: %lu (%s)\n", origin, p == origin ? "self" : objstr(origin));
+    printf("m_tbl: %p (%lu)\n", m_tbl, rb_id_table_size(m_tbl));
+    printf("const_tbl: %p (%lu)\n\n", const_tbl, const_tbl ? rb_id_table_size(const_tbl) : 0);
+}
+
+void
+schemaof(VALUE mod)
+{
+    VALUE p, prev, current;
+
+    for (p = mod; p; p = RCLASS_SUPER(p)) {
+        if (BUILTIN_TYPE(p) == T_ICLASS) {
+            printf("%-15s", objstr(METACLASS_OF(p)));
+        } else {
+            printf("%-15s", objstr(p));
+            for (prev = p, current = METACLASS_OF(p);
+                 current != prev;
+                 prev = current, current = METACLASS_OF(current)) {
+                printf("%-40s", objstr(current));
+            }
+        }
+        printf("\n");
+    }
+}
+
 /*
  *  call-seq:
  *     mod.ancestors -> array
@@ -1586,6 +1642,9 @@ rb_mod_ancestors(VALUE mod)
     }
 
     for (p = mod; p; p = RCLASS_SUPER(p)) {
+
+        objdebug(p);
+
         if (p == refined_class) break;
         if (p != RCLASS_ORIGIN(p)) continue;
         if (BUILTIN_TYPE(p) == T_ICLASS) {
